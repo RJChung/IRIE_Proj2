@@ -129,7 +129,8 @@ import numpy as np
 def relation_list(sentence_list,DF):
     
     nDF = np.array(DF)
-    pos_set = ('VA','VAC','VB','VC', 'VD','VE','VF','VG','VH','VHC','VI','VJ','VK','VL','VCL','V2','VJ','Na','Nb','Nc')
+    pos_set = ('VA','VAC','VB','VC','Na','Nb','Nc')
+    #pos_set = ('VA','VAC','VB','VC', 'VD','VE','VF','VG','VH','VHC','VI','VJ','VK','VL','VCL','V2','VJ','Na','Nb','Nc')
     extract = []
     content = []
     
@@ -203,7 +204,7 @@ def get_count_features(group_relation,name_list):
         
     for ID, group in Features.items():
         try:
-            Features[ID] = Features[ID][1:30]
+            Features[ID] = Features[ID][1:35]
         except:
             Features[ID] = Features[ID][1:]
         
@@ -243,17 +244,24 @@ def feature_matrix(bow, Feature_set):
 #___________________________________________________    
 #import jieba.analyse
 '''利用結巴套件來計算每種關係中，每個詞彙的tf-idf值,並取出前10大詞彙當成其特徵值'''
-'''
-def features(bow):
+import jieba.analyse
+def get_tfidf_features(train_bow,nameList):
     Feature = {}
-
-    for ID, test in bow.items():
-        feature = jieba.analyse.extract_tags(bow[ID],10,withWeight = False,allowPOS = False)
+    bow = dict(train_bow)
+    tmp = str()
+    for ID, text in bow.items():
+        for wd in text:
+            if wd not in nameList:
+                tmp = tmp+ ' ' + wd
+        bow[ID] = tmp
+        tmp = str()
+        
+    for ID, text in bow.items():
+        feature = jieba.analyse.extract_tags(text,20,withWeight = False,allowPOS = False)
         Feature[ID] = feature
-
     return Feature
 #___________________________________________________    
-'''
+
 
 '''implement'''
 #資料匯入
@@ -281,24 +289,42 @@ test_bow = relation_list(sent_list,DF_test)
 word_counts = get_count_features(train_bow, nameList(DF_train))
 
 features = get_feature_set(word_counts)
-
 # 以訓練集所萃出出的特徵矩陣為最後的output變數
 Feature_matrix = feature_matrix(train_bow, features)
+
 # 計算測試集的特徵矩陣為何(將用於丟進機器學習)
 test_matrix = feature_matrix(test_bow, features)
 
+#___________________________________________________
+'''TFIDF測試區'''
+'''
+tfidf = get_tfidf_features(train_bow, nameList(DF_train)) ###
+tfidf_features = get_feature_set(tfidf) ###
+TFIDF_Feature_matrix = feature_matrix(train_bow, tfidf_features) ###
+TFIDF_test_matrix = feature_matrix(test_bow, tfidf_features) ###
+'''
 #___________________________________________________
 
 '''訓練與測試資料的準備'''
 from sklearn import  metrics   
 # 建立訓練與測試資料
-train_X = Feature_matrix.iloc[:,0:len(Feature_matrix.columns)-1]
-train_y = Feature_matrix.iloc[:,250] #先寫死 待會改
-test_X = test_matrix.iloc[:,0:len(test_matrix.columns)-1]
-test_y = test_matrix.iloc[:,250]
-#, test_X, train_y, test_y
+train_X = Feature_matrix.iloc[:,0:-1]
+train_y = Feature_matrix.iloc[:,-1]
+test_X = test_matrix.iloc[:,0:-1]
+test_y = test_matrix.iloc[:,-1]
+#___________________________________________________
+
+'''TF-IDF版本'''
+'''
+train_X = TFIDF_Feature_matrix.iloc[:,0:-1]
+train_y = TFIDF_Feature_matrix.iloc[:,-1]
+test_X = TFIDF_test_matrix.iloc[:,0:-1]
+test_y = TFIDF_test_matrix.iloc[:,-1]
+'''
+#___________________________________________________
 
 
+#___________________________________________________
 ''' SVM 分類器 '''
 from sklearn import svm
 # 建立向量支持器 分類器
@@ -317,11 +343,12 @@ cm = metrics.confusion_matrix(test_y, svc_test_y_predicted)
 
 #使用kernel='linear', 再加入辭典(.strip())
 print('TRAIN SCORE: ',svc.score(train_X, train_y),' TEST SCORE: ', svc.score(test_X, test_y))
+
 #__________________________________________________________________
+'''隨機森林 分類器'''
 from sklearn.ensemble import RandomForestClassifier
 # 建立 random forest 分類器
-forest = RandomForestClassifier(n_estimators = 10) #n_jobs=-1,max_features='auto', \
-                                #n_estimators = 3,random_state = 0)
+forest = RandomForestClassifier(n_estimators = 100)
 
 forest_fit = forest.fit(train_X, train_y)
 
